@@ -1,0 +1,19 @@
+# IDE
+/.idea/
+/demo-ui.iml
+
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Build output
+/dist/
+/build/
+
+# Env
+.env
+.env.local
