@@ -17,3 +17,4 @@ yarn-error.log*
 # Env
 .env
 .env.local
+/tech-design.iml
