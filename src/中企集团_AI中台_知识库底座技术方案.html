@@ -47,12 +47,20 @@
   .closer .lb{ display:inline-block; min-width:52px; margin-right:10px; padding:1px 9px; background:#1F4E79; color:#fff; border-radius:4px; font-size:13px; text-align:center; }
   .closer .note{ margin:12px 0 0; font-weight:400; font-size:13.5px; line-height:1.75; color:#33485e; }
   text{ font-family:inherit; }
+  details{ margin:12px 0; border:1px solid #d3dae2; border-radius:6px; background:#fafbfc; padding:0 14px; }
+  details[open]{ padding-bottom:8px; }
+  summary{ cursor:pointer; font-weight:700; color:#1F4E79; font-size:14px; padding:10px 0; list-style:none; }
+  summary::before{ content:"▸ "; color:#2E75B6; }
+  details[open] summary::before{ content:"▾ "; }
+  details .pt{ font-size:14px; margin:12px 0 2px; }
   @media print{
     body{ background:#fff; }
     .page{ box-shadow:none; margin:0; max-width:none; padding:0 8mm; }
     h2.sec{ break-after:avoid; }
     .fig, table, pre{ break-inside:avoid; }
     pre{ background:#0f1b2d !important; }
+    details{ border:none; background:none; padding:0; }
+    details summary::before{ content:""; }
     @page{ size:A4; margin:14mm; }
   }
 </style>
@@ -148,10 +156,11 @@
 <h3>2.2 系统分层架构</h3>
 <p>把逻辑层落到可部署的组件,按层叠起来看:接入方 → 接入层 → 能力层(含<span class="k">在线服务</span>与<span class="k">离线处理</span>两条)→ 模型与网关 → 存储层,治理 / 安全 / 多租户 / 可观测 / 元数据横切各层。在线服务读存储、离线处理写存储,共享同一套存储与网关。</p>
 <div class="fig">
-<svg viewBox="0 0 1000 560" role="img" aria-label="系统分层架构">
+<svg viewBox="0 0 1060 560" role="img" aria-label="系统分层架构">
   <defs>
     <marker id="dn" markerWidth="9" markerHeight="9" refX="6" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F4E79"/></marker>
     <marker id="hz" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#888"/></marker>
+    <marker id="rw" markerWidth="9" markerHeight="9" refX="6.5" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#C0504D"/></marker>
   </defs>
   <!-- L1 接入方 -->
   <rect x="40" y="18" width="920" height="64" rx="10" fill="#EDE7F6" stroke="#7a5ea0" stroke-width="2"/>
@@ -223,14 +232,17 @@
   </g>
   <text x="512" y="326" font-size="10" font-weight="700" fill="#1F4E79">调用模型 / 嵌入</text>
   <text x="512" y="406" font-size="10" font-weight="700" fill="#1F4E79">读 / 写</text>
+  <!-- 业务数据回流:接入方 → (接入层/离线) → 效果库存储 -->
+  <path d="M 960 50 L 1010 50 L 1010 419 L 958 419" fill="none" stroke="#C0504D" stroke-width="2" stroke-dasharray="7 4" marker-end="url(#rw)"/>
+  <text x="950" y="235" font-size="11" font-weight="700" fill="#C0504D" transform="rotate(-90 1036 235)">业务回流 · 效果/采纳 → 效果库(Postgres)</text>
 </svg>
 </div>
-<p class="cap">纯分层架构:接入方 → 接入层(网关) → 能力层(在线服务 / 离线处理) → 模型与网关 → 存储层;治理、安全、多租户、可观测、元数据横切各层。在线服务读存储、离线处理写存储,共享同一套存储。</p>
+<p class="cap">纯分层架构:接入方 → 接入层(网关) → 能力层(在线服务 / 离线处理) → 模型与网关 → 存储层;治理、安全、多租户、可观测、元数据横切各层。在线服务读存储、离线处理写存储,共享同一套存储。右侧红色虚线为<span class="k">业务回流</span>:调用方产生的效果 / 采纳数据经接入层与离线处理沉淀回效果库(呼应第三章数据飞轮)。</p>
 <ul>
   <li><span class="k">API 网关:</span>所有调用的统一入口,负责鉴权、限流、路由,同时暴露 REST 与 MCP 两种协议。</li>
   <li><span class="k">编排服务(知识库层):</span>在线请求的大脑——决定查哪个库、混合检索、重排、组装 RAG 上下文;以 MCP/OpenAPI 暴露挂载式能力,循环在调用方。</li>
   <li><span class="k">Agent 层(规划演进):</span>在知识库层之上提供完整 AI 能力(编排 + 工具 + 多步推理),只承载横向通用 Agent(内容生成、GEO 诊断);循环在 Agent,纵向营销决策仍归业务侧。</li>
-  <li><span class="k">Token/LLM 网关:</span>所有大模型/嵌入调用都经它(详见第七章),统一密钥、计量、限流、缓存、降级。</li>
+  <li><span class="k">Token/LLM 网关:</span>所有大模型/嵌入调用都经它,统一密钥、计量、限流、缓存、降级。</li>
   <li><span class="k">离线流水线:</span>调度器驱动采集→清洗→构建→入库各 Worker,通过消息队列解耦、可重跑、带状态。</li>
   <li><span class="k">共享存储:</span>向量库/图库/文档库/对象存储 + 主数据(MDM)与 ACL 权限表,在线读、离线写。</li>
 </ul>
@@ -313,6 +325,7 @@
 <tr><td><span class="k">领域库</span></td><td>跨客户专业知识、方法论、术语本体</td><td>权威资料、专家沉淀、公开语料</td><td>专业支撑、术语对齐、可引用单元</td><td><span class="k">向量 + 图谱</span></td></tr>
 <tr><td><span class="k">效果库</span></td><td>内容-渠道-成效对应(脱敏);含<span class="k">采纳</span>与<span class="k">成效</span>两类信号</td><td>CMS 发布/审核(采纳)、埋点、归因、成交回流(成效)</td><td>测评判优、<span class="k">行为加权检索</span>、反哺生成与策略</td><td>结构化 + 向量(行业×市场切片)</td></tr>
 </table>
+<p class="muted">六库中,产品、品牌、领域、行业(实体部分)以及 GEO 可引用单元属于<span class="k">结构清晰、需人工审校</span>的核心知识,建模为 concept 进入单一真相源(SSOT),并可导出为 OKF 格式供人阅读与交换;客户库的行为流与效果库的指标时序是关系型数据,留在各自的库内,不走这条轨。</p>
 
 <h3>3.3 六库与营销推理链</h3>
 <div class="fig">
@@ -364,7 +377,7 @@
 <p class="cap">按业务推理链看六库:一次营销机会要回答"卖什么→卖到哪→卖给谁→为什么买→怎么表达→效果如何",六个库分别为每一步供给知识(产品/行业/客户/领域/品牌/效果)。横向以 客户 ID、产品 ID 主线串联;效果库把跑出来的成效回流反哺各库,形成数据飞轮。(推理与决策在业务侧,底座只供知识)</p>
 
 <h3>3.4 典型场景:底座分别提供什么能力</h3>
-<p class="muted">这里只列底座<span class="k">能提供的能力</span>;怎么用、怎么决策由业务侧(接口契约见第六章、离线链路见第五章)。</p>
+<p class="muted">这里只列底座<span class="k">能提供的能力</span>;怎么用、怎么决策由业务侧。</p>
 <ul>
   <li><span class="k">建站 · 产品详情页</span>
     <ul>
@@ -385,7 +398,7 @@
   <li><span class="k">广告 · 落地页 / 素材</span><span class="muted">(现挂社媒,可独立)</span>
     <ul>
       <li><span class="k">卖点 / CTA 检索:</span>按 <code class="inl">customer_id</code> + 产品 / 品牌库过滤,取卖点句、合规口径。</li>
-      <li><span class="k">行为加权召回:</span>优先返回效果库中高点击 / 高转化的素材与文案版本(行为加权,见 6.2)。</li>
+      <li><span class="k">行为加权召回:</span>优先返回效果库中高点击 / 高转化的素材与文案版本。</li>
       <li><span class="k">带引用 RAG:</span>生成广告文案 / 落地页卖点,带品牌口径约束。</li>
       <li><span class="k">效果回流接口:</span>接收广告展现、点击、落地页转化与追踪参数,写入效果库。</li>
     </ul>
@@ -400,13 +413,13 @@
   </li>
 </ul>
 <p class="muted">共性能力:检索强制按 tenant / customer 过滤(不串户)、所有模型调用经 Token 网关、写入统一沉淀进效果库。</p>
-<div class="callout"><div class="t">交互的统一原则</div>业务系统对底座<span class="k">只通过接口读、通过链路写</span>,不碰底层存储。所有读带租户与权限上下文(A 客户看不到 B 客户),所有写最终沉淀进效果库,既隔离了客户数据,又让全公司的实践持续回流到同一个飞轮。<span class="k">注意:回流数据默认归本客户租户;只有脱敏 + 满足 k-匿名阈值(切片客户数 ≥ k)的切片,才会进入 shared 库供跨客户复用</span>(见 9.4)。</div>
+<div class="callout"><div class="t">交互的统一原则</div>业务系统对底座<span class="k">只通过接口读、通过链路写</span>,不碰底层存储。所有读带租户与权限上下文(A 客户看不到 B 客户),所有写最终沉淀进效果库,既隔离了客户数据,又让全公司的实践持续回流到同一个飞轮。<span class="k">回流数据默认归本客户租户;只有经过脱敏、且切片客户数达到 k-匿名阈值的切片,才会进入 shared 库供跨客户复用。</span></div>
 </section>
 
 <!-- ============ 四、数据结构 Schema ============ -->
 <section>
 <h2 class="sec">四、数据结构(Schema)</h2>
-<p class="clead">入库的核心 Schema:知识记录、知识图谱、主数据与效果库。</p>
+<p class="clead">先定架构层的统一存储模型(知识记录、知识图谱、主数据与效果库),它<span class="k">对来源无知</span>;再单独定义<span class="k">核心知识层</span>——以 SSOT 为单一真相、OKF 为导出格式的 concept 模型,以及它如何派生到架构层。</p>
 <h3>4.1 统一知识记录(chunk)</h3>
 <p><span class="k">chunk 表只承载非结构化知识</span>(文档、网页、资料切分后的文本片段),六个库共用一张表(用 <code class="inl">kb</code> 区分),便于统一检索与权限。<span class="k">结构化主体不进这张表</span>:客户画像 / 行为走主数据与关系表(4.3 MDM),效果指标走 effect 表(4.3),它们是指标 / 时序型数据,不该硬塞进"chunk + embedding"。需要语义检索时,只把它们的<span class="k">可读摘要</span>(如客户简介、效果洞察小结)生成一条 chunk 切片指回主体,<span class="k">主体留在各自的关系表</span>。统一记录结构:</p>
 <table>
@@ -422,14 +435,14 @@
 <tr><td><code class="inl">text</code></td><td>string</td><td>是</td><td>正文分块</td></tr>
 <tr><td><code class="inl">embedding</code></td><td>float[]</td><td>是</td><td>向量,维度随模型(Cohere v4)。<span class="k">物理上只存向量库</span>,文档库存文本 + 元数据(除非用 pgvector 让文档库兼当向量索引),不重复存</td></tr>
 <tr><td><code class="inl">embed_model</code></td><td>string</td><td>是</td><td>嵌入模型</td></tr>
-<tr><td><code class="inl">source</code></td><td>object</td><td>是</td><td>来源:{ type, uri, page }</td></tr>
+<tr><td><code class="inl">source</code></td><td>object</td><td>是</td><td>来源:{ type, ref, loc }。<span class="k">对来源无知</span>——type∈{file/crawl/db/okf/…},ref 是该来源的不透明标识(核心知识即 concept 的稳定 ID),loc 是定位(页码 / 行 / section 锚)。chunk 表<span class="k">不为任何来源开专用列</span></td></tr>
 <tr><td><code class="inl">acl</code></td><td>string[]</td><td>是</td><td>权限标签(role / customer_id)</td></tr>
 <tr><td><code class="inl">tags</code></td><td>string[]</td><td>否</td><td>标签</td></tr>
-<tr><td><code class="inl">version</code></td><td>int</td><td>是</td><td>文档级版本</td></tr>
+<tr><td><code class="inl">version</code></td><td>int</td><td>是</td><td>文档级版本(长尾轨用);核心知识的 chunk 版本随其 concept 版本,见 4.4</td></tr>
 <tr><td><code class="inl">valid_from / valid_to</code></td><td>date</td><td>是 / 否</td><td>生效 / 失效时间(过期即下线)</td></tr>
 <tr><td><code class="inl">created_at</code></td><td>datetime</td><td>是</td><td>创建时间</td></tr>
 </table>
-<p class="muted">其中 <code class="inl">source</code> 为嵌套对象 <code class="inl">{type, uri, page}</code>,<code class="inl">acl</code> / <code class="inl">tags</code> 为字符串数组;<code class="inl">valid_to</code> 为空表示长期有效。</p>
+<p class="muted">其中 <code class="inl">source</code> 为嵌套对象 <code class="inl">{type, ref, loc}</code>,<code class="inl">acl</code> / <code class="inl">tags</code> 为字符串数组;<code class="inl">valid_to</code> 为空表示长期有效。</p>
 <h3>4.2 知识图谱 Schema</h3>
 <p>图谱存实体与关系,支撑多跳推理(行业/领域/品牌库重点用)。节点与边定义:</p>
 <table>
@@ -449,6 +462,7 @@
 <tr><td>Person → ENGAGED → Content</td><td>互动(time, type)</td></tr>
 <tr><td>Customer → CONVERTED → Product</td><td>成交(time, amount)</td></tr>
 </table>
+<p class="muted">节点 / 边有两个来源,共存于同一张图:<span class="k">实体抽取</span>(从长尾内容自动抽取)与 <span class="k">核心知识投影</span>(核心知识的 concept 投影为节点、其图谱边 <code class="inl">from_id → to_id</code> 即图的边)。核心知识的节点以 concept 稳定 ID 为身份,可与抽取得到的同名实体对齐 / 合并。</p>
 <h3>4.3 主数据(MDM)与效果库</h3>
 <p class="pt">客户主数据(MDM,唯一真相,六库共用外键)</p>
 <table>
@@ -475,6 +489,65 @@
 <tr><td><code class="inl">anonymized</code></td><td>bool</td><td>是否已脱敏(跨客户复用前必须为 true)</td></tr>
 <tr><td><code class="inl">cohort_size</code></td><td>int</td><td>该切片(行业 × 市场)聚合的客户数;<span class="k">跨客户复用要求 ≥ k(默认 k=5)</span>,低于阈值不对外,防被反推</td></tr>
 </table>
+
+<h3>4.4 核心知识层:SSOT 与 OKF</h3>
+<p>核心知识(产品 schema、品牌口径、领域术语本体、行业实体、GEO 可引用单元)结构清晰、需人工或 Agent 审校,单独建模。这里有一个<span class="k">必须分清的边界:格式规范 ≠ 系统架构</span>。<span class="k">OKF(Open Knowledge Format)</span>是 Google 提出的可移植知识格式(带 frontmatter 的 markdown、concept 互链成图),它定位是<span class="k">编辑层 / 交换层</span>的约定;底座<span class="k">不把 OKF 文件当作内部真相</span>,而是把真相放在自动化管线写入的结构化存储里。</p>
+<div class="callout"><div class="t">第一性原理</div>真相住在 <span class="k">SSOT(单一真相源)</span>,所有 markdown / git / 向量 / 图谱 / HTML 表示都是<span class="k">可随时纯函数式重建的派生产物</span>。身份稳定、可 review、可审计、可增量、链接不腐烂,都是这一条的推论。</div>
+
+<p class="pt">SSOT:单一真相源(数据库,自动化写入)</p>
+<p>底座的知识生产以自动化为主(Agent 生成 concept、enrichment、向量、图谱),不经过 git。真相落在结构化存储中,持有:</p>
+<table>
+<tr><th style="width:24%">SSOT 内容</th><th>说明</th></tr>
+<tr><td><span class="k">Concept 记录</span></td><td>以<span class="k">稳定 ID(主键 / uuid)</span>为主键的结构化记录:frontmatter 字段、正文、summary</td></tr>
+<tr><td><span class="k">图谱边</span></td><td>概念间关系直接以 <code class="inl">from_id → to_id</code> 的边存在;SSOT 中<span class="k">不存在"路径链接"</span>,链接即图的一条边</td></tr>
+<tr><td><span class="k">派生索引源数据</span></td><td>向量、图谱索引等属派生层,可随时从 SSOT 重建</td></tr>
+</table>
+
+<p class="pt">身份模型:稳定 ID,与路径解耦</p>
+<p>Concept 的身份由 SSOT 中的稳定 ID 承载,<span class="k">从不依附文件路径</span>。"路径即身份"对纯 OKF 编辑层成立,但对企业平台是危险假设——组织调整使目录从 <code class="inl">sales/tables/orders</code> 迁到 <code class="inl">commerce/tables/orders</code> 时,若路径即身份,则图谱、引用、向量、citation 全部要迁移。锚定到 ID 后,<span class="k">目录的重命名 / 移动 / 拆分 / 合并都不影响身份与引用</span>:正文(及图谱)里的引用直接基于 ID,链接腐烂问题被结构性消除。路径只是 ID 在<span class="k">导出那一刻</span>生成的展示投影。</p>
+
+<p class="pt">OKF 的角色:导出 / 交换格式,非内核</p>
+<p><span class="k">本系统内部格式不是 conformant OKF</span>。OKF 的正文链接指向文件路径(保证 GitHub 可点、可移植);系统内部用 ID 图谱边。二者关系是:</p>
+<ul>
+  <li><span class="k">系统内部 / SSOT:</span>基于稳定 ID 的图谱边 <code class="inl">from_id → to_id</code>。</li>
+  <li><span class="k">导出为 conformant OKF:</span>export 时把 ID 边<span class="k">确定性地</span>展开为路径链接,生成可在 GitHub 渲染、可打包流通的标准 bundle。</li>
+</ul>
+<p class="muted">OKF 因此是底座的<span class="k">出口格式之一</span>,而非真相存储。海量长尾内容(报告 / 新闻 / SERP)既不进 SSOT 也不导出 OKF,直接切块入库;核心知识与长尾内容分两条轨入库。</p>
+
+<p class="pt">派生产物:一切人 / 外部可见表示都是 build 产物</p>
+<pre><span class="key">SSOT</span>(数据库,自动化写入)
+  · concepts(结构化记录,ID 为主键,含 summary)
+  · 图谱边(from_id → to_id)
+  · 文件↔ID / 路径映射(导出所需)
+        │  export(纯函数,单向,可重复执行)
+        ▼
+<span class="key">派生产物</span>(全部可丢、可纯函数重建)
+  · git 仓视图          <span class="c"># 源码态,带 diff / PR / blame,供人 review</span>
+  · GitHub Pages / OSS  <span class="c"># 渲染态,可点击,供人阅读</span>
+  · conformant OKF bundle / tarball   <span class="c"># 对外交换</span>
+  · 向量库 / 图谱索引    <span class="c"># 检索用派生层</span></pre>
+<p class="muted">数据流<span class="k">严格单向</span>,产物不反向写回真相。git 与 HTML 站点<span class="k">平级</span>,都是产物——git 只承担"源码态只读视图"(适合 review),<span class="k">不承担版本控制 SSOT 的职责</span>。某份产物的路径 / 链接过期无关紧要,重导一次即修正。</p>
+
+<p class="pt">三级组织:Tenant → Bundle → Concept</p>
+<table>
+<tr><th style="width:14%">层级</th><th style="width:28%">是什么</th><th>边界与对应</th></tr>
+<tr><td><span class="k">Tenant</span></td><td>终端客户(或 <code class="inl">shared</code> 共享空间)</td><td><span class="k">ACL 边界</span>,= 9.3 的隔离租户;下含多个 Bundle</td></tr>
+<tr><td><span class="k">Bundle</span></td><td>一组相互链接的 concept(导出时对应一个 OKF bundle / git 仓视图)</td><td><span class="k">知识图边界</span>;按业务域拆(product、brand…),权限按域授予</td></tr>
+<tr><td><span class="k">Concept</span></td><td>一个知识实体(导出为一个 md 文件)</td><td><span class="k">版本 / 权限 / 增量 / 图节点 / 引用 的唯一单位</span>;派生为 doc 向量 + section 向量 + 1 图节点 + 若干边</td></tr>
+</table>
+<p class="muted">Tenant 是 ACL 轴、Bundle 是知识图轴,二者解耦(不绑"一租户一 bundle"):大客户知识可达上万 concept,且团队需按域授权(Product 组看 product、Legal 组看 compliance)。</p>
+
+<p class="pt">从 SSOT 派生到检索层</p>
+<p>检索 / 图谱索引由 SSOT 单向派生,一个 concept 派生为:</p>
+<table>
+<tr><th style="width:24%">SSOT 元素</th><th>派生到检索层</th></tr>
+<tr><td>1 个 concept</td><td><span class="k">1 个 Document 向量</span>(由 title + frontmatter + summary + section 标题 + 抽取的关键词 / 实体生成,用于概念发现 / 粗召回,详见 6.2)</td></tr>
+<tr><td>concept 正文的各 section</td><td><span class="k">N 个 Section 向量</span>(精召回,纯派生、随 concept 整体重建,不独立成知识对象)</td></tr>
+<tr><td>frontmatter</td><td>chunk 的结构化过滤字段 + 图节点属性</td></tr>
+<tr><td>图谱边 <code class="inl">from_id → to_id</code></td><td>图谱的边(端点存稳定 ID)</td></tr>
+<tr><td>concept 身份</td><td>chunk 的 <code class="inl">source = { type:okf, ref:concept_id, loc:"#section" }</code></td></tr>
+</table>
+<div class="callout"><div class="t">两条纪律</div><span class="k">① 嵌入单位是 concept,不在 concept 内切 sub-chunk。</span>concept 内部可有多级标题(section / subsection,如 Overview / API / Deployment 各带子标题),section 向量按这些标题层级派生,不破坏 concept 边界;但<span class="k">若内容其实是多个可独立引用 / 独立失效的实体</span>(如一份百页手册里 API、部署、计费分属不同知识单元),应<span class="k">拆成多个 concept 用图谱边关联</span>,而不是堆进一个超大 concept 靠深层 subsection 兜住。判据:同一实体的不同切面 → 留在一个 concept 分多级 section;可独立引用的不同实体 → 拆 concept。section 始终是检索优化产物,不是知识单元。<span class="k">② 检索层由 SSOT 单向派生,可纯函数重建。</span>修改只发生在 SSOT,索引随之重建;不直接写向量 / 图库,也不让任何产物反向写回真相。citation 指向 concept 稳定 ID(可溯源到实体及其版本),不是 chunk_id。</div>
 </section>
 
 <!-- ============ 五、离线数据链路 ============ -->
@@ -525,6 +598,7 @@
 <tr><td><span class="k">订阅</span></td><td>订(subscribe)</td><td>新闻流、平台事件流</td><td>订阅连接器 / 流接入</td></tr>
 </table>
 <p>所有渠道进来后<span class="k">统一归一化</span>(打统一元数据、转统一消息格式)、进接入队列,再交给离线流水线。接入层屏蔽渠道差异,上层只看到"标准化的数据进来了"。</p>
+<p class="muted">注意:这里五类是<span class="k">原始数据源</span>。核心知识(concept / SSOT)不是原始源,而是从这些原始数据加工出来的<span class="k">派生产物</span>(5.3 的"生成 concept"),再作为 RAG 的数据源——它进入的是离线流水线的核心轨,不在本接入网关之列。</p>
 <p class="pt">配置化:一个数据源一份配置</p>
 <p>来源与连接、调度、入哪个库、字段映射、清洗规则、增量键、脱敏、权限,全部声明式定义。新增或调整数据源改配置即可,不动代码。以 CRM 增量拉取为例:</p>
 <pre><span class="c"># 从客户 CRM 增量拉取线索 → 客户库</span>
@@ -553,7 +627,8 @@
 <div class="fig">
 <svg viewBox="0 0 980 672" role="img" aria-label="离线数据链路流程图">
   <defs><marker id="fa" markerWidth="9" markerHeight="9" refX="6" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F4E79"/></marker>
-  <marker id="fx" markerWidth="9" markerHeight="9" refX="6" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#C6571E"/></marker></defs>
+  <marker id="fx" markerWidth="9" markerHeight="9" refX="6" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#C6571E"/></marker>
+  <marker id="fp" markerWidth="9" markerHeight="9" refX="6" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#7a5ea0"/></marker></defs>
   <rect x="290" y="14" width="260" height="40" rx="8" fill="#EAF1F6" stroke="#1F4E79" stroke-width="2"/><text x="420" y="39" text-anchor="middle" font-size="13" font-weight="700">① ingest.raw 队列</text>
   <rect x="290" y="74" width="260" height="48" rx="8" fill="#D6EAF8" stroke="#5090b4" stroke-width="2"/><text x="420" y="96" text-anchor="middle" font-size="13" font-weight="700">② 解析 · 清洗 Worker</text><text x="420" y="113" text-anchor="middle" font-size="10.5" fill="#2f5468">解析 / 去噪 / 实体 / 脱敏</text>
   <polygon points="420,134 536,176 420,218 304,176" fill="#FFF2CC" stroke="#b49628" stroke-width="2"/><text x="420" y="180" text-anchor="middle" font-size="12" font-weight="700">content_hash 变更?</text>
@@ -566,6 +641,12 @@
   <rect x="680" y="268" width="270" height="44" rx="8" fill="#FCE4D6" stroke="#C6571E"/><text x="815" y="294" text-anchor="middle" font-size="11.5">quarantine 隔离 → 人工复核</text>
   <rect x="680" y="420" width="270" height="48" rx="8" fill="#fff" stroke="#1F4E79"/><text x="815" y="441" text-anchor="middle" font-size="11.5" font-weight="700">存储</text><text x="815" y="459" text-anchor="middle" font-size="10.5" fill="#33485e">向量库 / 图库 / 文档库</text>
   <rect x="680" y="522" width="270" height="44" rx="8" fill="#f0f0f0" stroke="#999"/><text x="815" y="548" text-anchor="middle" font-size="11.5" fill="#555">重试 / 退避(回 ④)</text>
+  <!-- 核心轨分支:生成 concept -->
+  <rect x="20" y="348" width="250" height="52" rx="8" fill="#EDE7F6" stroke="#7a5ea0" stroke-width="2"/><text x="145" y="370" text-anchor="middle" font-size="12.5" font-weight="700" fill="#473a5e">核心轨:生成 concept</text><text x="145" y="388" text-anchor="middle" font-size="9.5" fill="#5a4880">抽取 → 人审 → 写 SSOT</text>
+  <path d="M 290 98 L 145 98 L 145 346" fill="none" stroke="#7a5ea0" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#fp)"/>
+  <path d="M 270 374 L 288 374" fill="none" stroke="#7a5ea0" stroke-width="1.8" marker-end="url(#fp)"/>
+  <text x="152" y="240" font-size="10" font-weight="700" fill="#7a5ea0">核心轨</text>
+  <text x="152" y="254" font-size="9" font-weight="400" fill="#7a5ea0">绕开长尾轨闸门</text>
   <g stroke="#1F4E79" stroke-width="2">
     <line x1="420" y1="54" x2="420" y2="72" marker-end="url(#fa)"/>
     <line x1="420" y1="122" x2="420" y2="132" marker-end="url(#fa)"/>
@@ -591,8 +672,9 @@
   </g>
 </svg>
 </div>
-<p class="cap">离线入库全流程,三处判断决定走向:内容没变就跳过(省嵌入)、质检不合格进隔离、三处写齐才切版本置 READY;任一 Worker 失败累计超阈值进 ingest.dlq,修复后重放。</p>
+<p class="cap">离线入库全流程,三处判断决定走向:内容没变就跳过(省嵌入)、质检不合格进隔离、三处写齐才切版本置 READY;任一 Worker 失败累计超阈值进 ingest.dlq,修复后重放。<span class="k">长尾轨</span>(裸文本)走中间主链,经两道闸门;<span class="k">核心轨</span>(紫线)在解析/清洗后先生成 concept 写入 SSOT,绕开闸门直接进③构建,并以 concept 为单位整体重建。</p>
 <p><span class="k">每个环节是一个独立 Worker,用消息队列解耦、可重跑、带状态</span>——不是一段串行脚本。下面是可照着实现的处理模型。</p>
+<p class="muted"><span class="k">多模态资产(分期)</span>:建站 / 社媒有大量图片(Banner、产品图)与短视频。<span class="k">一期</span>在解析环节做<span class="k">文本化提取</span>——图片走 OCR / caption / alt、视频走转写 / 关键帧标签,产出的文本接入现有文本管线,与其它 chunk 同等检索。<span class="k">演进项</span>:引入多模态嵌入(图文同向量空间),支持以文搜图 / 图文混排检索。</p>
 <h4>处理模型与队列</h4>
 <ul>
   <li>队列 topic 串起各环节:<code class="inl">ingest.raw</code> →(解析清洗)→ <code class="inl">ingest.clean</code> →(构建)→ <code class="inl">ingest.write</code>;失败进 <code class="inl">ingest.dlq</code>。</li>
@@ -607,6 +689,7 @@
 <h4>状态机(每个 doc/chunk 一条)</h4>
 <p>discovered → fetched → parsed → cleaned → chunked → embedded → indexed → <span class="k">ready</span>;异常 → quarantined;被新版本取代 → superseded。状态落 <code class="inl">pipeline_state</code> 表,断点可续、可重跑。</p>
 <h4>幂等与增量(省钱的关键)</h4>
+<p class="muted">下面是<span class="k">长尾轨</span>(裸文本切块)的增量机制。</p>
 <ul>
   <li><code class="inl">record_id</code> 由源主键确定 → 重复投递不会重复入库。</li>
   <li>比对 <code class="inl">content_hash</code>:正文没变就<span class="k">跳过嵌入与写入</span>——嵌入是主要成本,增量场景绝大多数记录会被跳过。</li>
@@ -617,6 +700,42 @@
 <p>写顺序:文档库 → 向量库 → 图库,三处都是按 <code class="inl">chunk_id</code> / <code class="inl">node_id</code> 的<span class="k">幂等 upsert</span>,任一步失败可安全重试。用 outbox 表记待写、对账 job 定期核对三处计数差异;最终一致,检索侧靠 version 兜底。</p>
 <h4>失败与重放</h4>
 <p>重试带指数退避;超过 N 次进 <code class="inl">ingest.dlq</code> + <code class="inl">quarantine</code> 表(记原因与原始件指针);修复后一键重新入队重放,不丢数据。</p>
+
+<h3>5.3 双轨入库:核心轨(SSOT / concept)与长尾轨</h3>
+<p>上面这条链路适用于海量长尾内容(报告 / 新闻 / SERP、历史投放原文、行为流)——直接切块入库,不强制结构化。核心知识(产品、品牌、领域、行业实体、GEO 可引用单元)则走另一条轨:提炼成 concept 写入 <span class="k">SSOT</span>,再由 SSOT 派生入库。两条轨共用同一套存储与 chunk 写入口,区别只在前段:</p>
+<table>
+<tr><th style="width:12%">轨</th><th style="width:34%">链路</th><th style="width:30%">适用</th><th>规模</th></tr>
+<tr><td><span class="k">核心轨</span></td><td>原始 → 提炼为 concept(写入 <span class="k">SSOT</span>)→ 派生 chunk / 图 / 向量,并导出 OKF 视图</td><td>领域、产品、品牌、行业实体、GEO 可引用单元</td><td>小、高价值、SSOT 为真相</td></tr>
+<tr><td><span class="k">长尾轨</span></td><td>原始 → 切块 → 向量(即上面 5.2 的链路)</td><td>海量报告 / 新闻 / SERP、历史投放原文、行为流</td><td>大、低单值</td></tr>
+</table>
+<p class="muted">不全量走核心轨,是因为 OKF / concept 面向数量有限、需人工审校的高价值知识;长尾百万级片段无法逐条精修成 concept,若强制要求,瓶颈会从向量数量转移到精修产能。规模问题由分层处理,核心轨本身不解决规模。下面依次讲核心轨的三件事:怎么生成 concept、存在哪、怎么增量。</p>
+
+<p class="pt">一、生成 concept(核心轨前段)</p>
+<p>核心知识进入派生入库之前,先经一段提炼环节转成 concept,接在解析 / 清洗之后、构建之前(长尾轨没有这一段):</p>
+<ul>
+  <li><span class="k">抽取:</span>抽取 Worker 读清洗后的内容,按 concept 边界拆出实体(一张表 / 一个指标 / 一个产品 / 一条 runbook),为每个生成 concept 草稿,填 frontmatter(type 必填、title、tags、summary)、正文(schema / 卖点 / 步骤)与到其他 concept 的图谱边(由实体识别得出)。草稿可由 LLM 起草、规则补全。</li>
+  <li><span class="k">人审(按需):</span>核心知识可经人审——在 git 导出视图上 review、把修订写回 SSOT;低风险或机器维护的可直接入 SSOT 或抽样复核。人审的修订量沉淀为效果库的采纳信号。</li>
+  <li><span class="k">写入:</span>定稿 concept 写入 SSOT(稳定 ID 为主键),产出一条变更事件,触发后面的派生入库。</li>
+</ul>
+<p class="muted">之后的切分 / 嵌入 / 图谱构建与长尾轨共用同一套构建与入库环节,只是输入来自 SSOT 的 concept 而非裸文本。</p>
+
+<p class="pt">二、存在哪:写入 SSOT,git / 站点是导出视图</p>
+<p>定稿 concept 写入 <span class="k">SSOT(结构化存储)</span>,这是唯一真相。供人 review / 阅读 / 交换的 git 仓、HTML 站点、OKF bundle 都是从 SSOT <span class="k">单向 export</span> 的产物,人不在产物里改知识:</p>
+<ul>
+  <li><span class="k">人对 git 视图只读:</span>修改走 SSOT(或经 Agent / 工具),git 永远是单向导出的镜像,不存在"产物反向写回真相"的逆向解析难题。</li>
+  <li><span class="k">SSOT 变更自动触发导出:</span>"只读"不再是要人遵守的约定,而是系统涌现的事实——任何人的手动 commit 会在下次自动导出时被对齐覆盖。export 须<span class="k">全量、幂等、强制对齐</span>(读 SSOT 全量状态生成应有视图、多余文件删除、改动覆盖回去),对高频写入做去抖 / 合批,commit message 标注 SSOT 版本 / 批次 ID,使 git 视图成为可审计的变更日志。</li>
+</ul>
+
+<p class="pt">三、怎么增量:SSOT 变更事件驱动</p>
+<p>增量由 <span class="k">SSOT 变更事件</span>驱动:每次 concept 写入产生一条 <code class="inl">{ concept_id, op }</code> 事件(<code class="inl">op ∈ 新增 / 改 / 删 / 改名</code>),与导出后端无关。</p>
+<ul>
+  <li><span class="k">最小单位 = concept,整体重建:</span>单个 concept 约几百至几千 token,重建成本低。新增 / 改时删除该 concept 的全部派生向量(doc + section),重新生成、嵌入并 upsert,不在内部逐块求差。</li>
+  <li><span class="k">改名零成本:</span>身份是稳定 ID、与路径解耦,改名只是 export 时路径投影变化,<span class="k">不触发任何重嵌</span>——这是 ID 身份相对"路径即身份"的直接收益。</li>
+  <li><span class="k">删除与失效传播:</span>删除 concept 时,依赖它的概念由 <span class="k">backlink 索引</span>查出并校验链接完整性;被引概念按 deprecation 处理(标记、检索降权),不硬删。因身份不依附路径、正文不含路径,失效传播主要发生在 export 渲染阶段,真相层基本无腐烂。</li>
+  <li><span class="k">图增量:</span>frontmatter 更新为节点属性(无嵌入);图谱边随 SSOT 的 <code class="inl">from_id → to_id</code> 变更做差集(增 / 删边),不重建整图。</li>
+  <li><span class="k">原子与幂等:</span>变更 concept 全部 upsert 后再推进检索侧的 <code class="inl">indexed_ver</code>,读一致快照;按 <code class="inl">(concept_id, content_hash)</code> upsert,重放为幂等空操作;失败进 DLQ 重放。派生层可随时从 SSOT 全量重建。</li>
+</ul>
+<p class="muted">因为身份是稳定 ID、正文不含路径,链接腐烂与跨 bundle 路径反解析在写入阶段就不会发生,无需额外的 resolver 或注册表兜底。跨 bundle 引用就是图谱里一条跨域的边,处理方式与域内边相同。</p>
 </section>
 
 <!-- ============ 六、在线链路与服务协议 ============ -->
@@ -629,7 +748,7 @@
   <li><span class="k">② LLM 集成层(可选,靠近业务):</span>在召回结果上接 LLM 做问答/生成,模型走 Token 网关。对应 <code class="inl">/v1/rag/query</code>。底座提供"开箱即用的 RAG 问答"作为便利能力,但业务也可自带模型、自行编排。</li>
   <li><span class="k">③ Agent 层(完整能力,规划演进):</span>编排 + 工具调用 + 多步推理,对外"给目标 → 交付成品",<span class="k">循环在 Agent</span>(它自己挂载 ①②、调工具、产出)。只承载横向通用 Agent(内容生成、GEO 诊断);纵向营销决策仍归业务侧。</li>
 </ul>
-<p class="muted">关键:换模型、加模型、甚至不用模型,都不影响检索层。检索是底座的硬能力(本期),模型集成与 Agent 层是其上的可插拔 / 可演进层。</p>
+<p class="muted">换模型、加模型或不用模型都不影响检索层。检索是本期的核心能力,模型集成与 Agent 层在其之上,可插拔、可后续演进。</p>
 <h3>6.2 在线检索时序</h3>
 <div class="fig">
 <svg viewBox="0 0 980 664" role="img" aria-label="在线检索流程图">
@@ -672,48 +791,24 @@
   </g>
 </svg>
 </div>
-<h4>编排逻辑(对应上图)</h4>
-<ul>
-  <li><span class="k">鉴权与缓存:</span>先校验租户与知识库权限(无权限直接拒绝);用"<span class="k">tenant_id + ACL</span> + 归一化查询 + 知识库 + 过滤条件"算缓存键,命中则直接返回。<span class="k">tenant 必须进缓存键 / 分桶</span>——语义缓存只在同租户向量空间内做近似命中,杜绝跨客户串户。</li>
-  <li><span class="k">查询改写与嵌入:</span>查询改写<span class="k">默认关闭</span>(只对口语 / 含糊查询按需开,失败回退原查询,避免给主链路平白加几百 ms);再经 Token 网关生成查询向量。</li>
-  <li><span class="k">并行召回 + 融合:</span>向量检索与关键词(BM25)各取 top50、并行执行(都下推租户与 ACL 过滤),用 RRF 融合成候选集。</li>
-  <li><span class="k">图谱按需介入:</span>仅当问题属于关系 / 趋势 / 对比类时,链接实体、取 2 跳子图,合并进候选。</li>
-  <li><span class="k">重排与行为加权:</span>对候选先做语义重排,再叠加<span class="k">效果库的行为加权</span>(详见下),综合排序后取 top8;<code class="inl">mode=search</code> 直接返回检索结果,<code class="inl">mode=rag</code> 则再经生成层产出带引用的答案。最后写缓存返回。</li>
-</ul>
-<h4>行为数据加权(对应总体架构 R4 的"加权"模块)</h4>
-<p>语义重排只解决"<span class="k">相关</span>",不解决"<span class="k">有效</span>"。效果库沉淀的两类信号要回灌为<span class="k">检索/生成的偏好信号</span>,让客户认可、跑出过成效的内容在召回中被优先选用:</p>
-<ul>
-  <li><span class="k">检索侧:</span>候选的最终序 = 语义重排分 × 行为权重因子(按 content_id 关联效果库,按行业 × 市场切片取分位);<span class="k">成效信号</span>(点击 / 完读 / 转化 / AI 引用)为主、权重高,高转化高引用内容上浮。</li>
-  <li><span class="k">生成侧:</span>组装 RAG 上下文时,同等相关的片段优先选用历史成效更好的版本,形成"<span class="k">回流 → 评估 → 增益</span>"闭环。</li>
-  <li><span class="k">冷启动用采纳信号兜底:</span>内容刚发布、尚无流量时,用 CMS 的<span class="k">采纳信号</span>(原样发布 = 轻正向先验、大改 = 轻负向、驳回 = 过滤)替代中性权重——客户认可本身就是早期质量信号,但权重低于实测成效,跑出数据后让位给成效信号。</li>
-  <li><span class="k">防偏:</span>权重因子设上下限,避免马太效应把长尾彻底压死。</li>
-</ul>
-<p class="muted">这与 RRF / rerank 是两件事:RRF 融合多路召回、rerank 调语义相关性,<span class="k">行为加权调"经实证有效"</span>——三者叠加。加权因子的更新走离线链路(效果库聚合 → 算分位 → 落 content 权重表),在线只读,不增加检索延迟。</p>
-<h4>混合检索怎么融合(RRF)</h4>
-<p>向量 top50 与关键词(BM25)top50 用<span class="k">倒数排名融合</span>合并:每个文档得分 = Σ 1 / (k + 该路命中排名),k 取 60;融合后取前 30 交 rerank,再取前 8 进上下文。向量管"语义近"、BM25 管"关键词准",互补。</p>
-<h4>图谱子图怎么取</h4>
-<p>关系类问题先把查询里的实体链接到图谱,再用 Cypher 拉 2 跳子图(强制带租户过滤):</p>
+<p>一次查询的处理主线:<span class="k">鉴权 → 缓存 → 嵌入 → 并行召回 + 融合 →(关系类按需走图谱)→ 重排 + 行为加权 → 按 mode 返回</span>。几个要点:鉴权后用含 <code class="inl">tenant_id</code> 的缓存键命中即返回,杜绝跨客户串户;召回阶段向量与关键词并行、都下推租户与 ACL 过滤;<span class="k">核心知识与长尾内容走同一套接口、落同一索引,来源差异对调用方不可见</span>,只是核心知识(concept)的向量召回多一层"先定位概念、再下钻 section"的结构;最后按 <code class="inl">mode</code> 决定只返回检索结果还是接生成层产出带引用的答案,引用统一指向稳定的 concept ID 或原始 source。</p>
+<details>
+<summary>实现细节(融合、图谱、两层召回、行为加权、延迟)</summary>
+<p class="pt">混合检索融合(RRF)</p>
+<p>向量 top50 与 BM25 top50 用倒数排名融合:每个文档得分 = Σ 1 / (k + 该路命中排名),k 取 60;融合后取前 30 交 rerank,再取前 8 进上下文。向量管语义近、BM25 管关键词准,互补。</p>
+<p class="pt">核心知识的两层召回</p>
+<p>concept 派生 Document 向量与 Section 向量。Document 向量由 title + frontmatter + summary + 各 section 标题 + 从正文确定性抽取的关键词 / 实体生成(不只用 summary,避免"支持 Oracle 吗"这类细节在摘要里被吞掉而漏召回),所有输入从 concept 内容确定性派生、可纯函数重建。召回先用 Document 向量定位相关概念,再在命中 concept 内用 Section 向量精召回;frontmatter(type / tags)与图谱关系作为结构化条件一并下推过滤。两条约束:<span class="k">summary 等派生输入须持久化进 SSOT</span>(否则向量层依赖会漂移、无法重建的数据);<span class="k">防第一层漏召回</span>——概念数数百到数千时第一层以结构化过滤为主、可放宽 Top-K,概念数大时另开 section 直召旁路做 hybrid 融合。Agent 也可不走检索,直接从某 concept 顺图谱边逐层展开读取。</p>
+<p class="pt">图谱子图</p>
+<p>关系类问题先把查询实体链接到图谱,再用 Cypher 拉 2 跳子图(强制带租户过滤):</p>
 <pre>MATCH (c:Company {id:$ent})-[:IN_INDUSTRY]->(i:Industry)
 OPTIONAL MATCH (c)-[:COMPETES_WITH]->(x:Company)
 WHERE c.tenant_id = $tenant
 RETURN c, i, collect(x)[..20] AS competitors</pre>
-<h4>延迟预算(现实口径)</h4>
-<p>关键:<span class="k">嵌入与重排是外部 API 调用(Cohere),要按网络往返算,不能按本地内存操作算</span>。一次走外部模型的检索,实际开销主要花在 RTT 上:</p>
-<table>
-<tr><th style="width:24%">环节</th><th style="width:26%">典型 P95</th><th>说明</th></tr>
-<tr><td>查询改写(可选)</td><td>+150~600ms(用 LLM 时)</td><td><span class="k">默认关闭</span>;仅口语 / 含糊查询按需开。规则改写 &lt; 5ms</td></tr>
-<tr><td>嵌入(Cohere 外部)</td><td>60~150ms(命中缓存为 0)</td><td>含网络往返;自托管嵌入可压到 &lt; 20ms</td></tr>
-<tr><td>向量召回 + BM25</td><td>30~50ms(并行)</td><td>本地 / 托管库,可并行</td></tr>
-<tr><td>图谱 2 跳(仅关系类)</td><td>40~80ms</td><td>非关系类不走</td></tr>
-<tr><td>重排(Cohere 外部)</td><td>100~300ms</td><td>含网络往返;是检索路径最大头</td></tr>
-</table>
-<p>据此给出<span class="k">分档目标</span>(而非一刀切 150ms):</p>
-<ul>
-  <li><span class="k">纯检索、关缓存、不 rerank、不重写:</span>P95 ≤ 150ms(向量 + BM25 本地融合)。</li>
-  <li><span class="k">检索 + 外部 rerank:</span>P95 ≤ 400ms(rerank 是主要开销)。</li>
-  <li><span class="k">RAG 端到端:</span>上面再加生成 1~2.5s(取决于模型与上下文长度)。</li>
-</ul>
-<p class="muted">想把 P95 压到 ~150ms 且仍带 rerank,需把嵌入 / rerank 换成<span class="k">自托管或同区低延迟</span>模型;只要用外部 API,就按上表的 RTT 口径设目标,别低估。</p>
+<p class="pt">行为加权</p>
+<p>语义重排只解决"相关"、不解决"有效"。效果库的成效信号(点击 / 完读 / 转化 / AI 引用)与采纳信号回灌为排序偏好:最终序 = 语义重排分 × 行为权重因子(按 content_id 关联、按行业 × 市场切片取分位),高转化高引用内容上浮;新内容无流量时用 CMS 采纳信号(原样发布=轻正向、大改=轻负、驳回=过滤)做冷启动先验,权重低于实测成效;权重设上下限防马太效应。加权因子离线更新、在线只读,不增加延迟。</p>
+<p class="pt">延迟预算(现实口径)</p>
+<p>嵌入与重排是外部 API(Cohere),按网络往返(RTT)算:查询改写默认关闭(开则 +150~600ms),嵌入 60~150ms、向量+BM25 并行 30~50ms、图谱 2 跳 40~80ms、重排 100~300ms(路径最大头)。分档目标:纯检索(不 rerank)P95 ≤ 150ms;带外部 rerank P95 ≤ 400ms;RAG 端到端再加生成 1~2.5s。想压到 150ms 且带 rerank,需把嵌入 / rerank 换成自托管或同区低延迟模型。</p>
+</details>
 <h3>6.3 REST API 契约</h3>
 <p><span class="k">混合检索</span> <code class="inl">POST /v1/search</code> —— 只检索、不生成:</p>
 <pre><span class="c">// 请求</span>
@@ -821,9 +916,13 @@ RETURN c, i, collect(x)[..20] AS competitors</pre>
 <tr><td><span class="k">模型网关</span></td><td>横切</td><td>接入(复用)+ 应用维度计量</td><td>接入走 xapi;薄中间件计量/配额/缓存</td><td>新网 xapi + 薄中间件</td><td>复用已有、不重复造</td></tr>
 <tr><td><span class="k">编排调度</span></td><td>平台 · 离线</td><td>驱动流水线、可重跑</td><td>工作流编排</td><td>Airflow / Dagster</td><td>成熟工作流</td></tr>
 </table>
-<div class="callout"><div class="t">自建 vs 云:怎么权衡</div>基础设施(向量库、图库、解析、嵌入)<span class="k">优先云托管</span>,省运维快落地。但两类资产必须<span class="k">自有、可迁移</span>:① 知识图谱与效果库(沉淀出来的核心资产);② 入库 pipeline 逻辑(托管 RAG 管道锁定最重,换平台要重切分、重嵌入、重验证)。原则:<span class="k">借云的算力和组件,但不把飞轮交给云。</span></div>
-<div class="callout"><div class="t">图谱抽取的成本边界(别全量跑 GraphRAG)</div>GraphRAG 的索引阶段是<span class="k">重 LLM 调用</span>的——每个 chunk 多轮实体/关系抽取 + 社区摘要。在"千万级 chunk 起步"的规模下全量跑,其离线成本可能是<span class="k">嵌入成本的数倍</span>,与第七章"Token 经济"的目标相悖。因此明确收口:① <span class="k">只对真正需要多跳的库</span>(行业 / 领域 / 品牌)抽图谱,客户 / 产品 / 效果库不抽;② <span class="k">按重要性采样</span>,只对高价值文档(权威源、高频引用、核心实体)做抽取,长尾走纯向量;③ 抽取调用同样<span class="k">经 Token 网关计量</span>,纳入预算与告警。图谱能力列为<span class="k">渐进落地项</span>:一期先把向量 + BM25 混检跑通,二期再按上述边界叠加图谱。</div>
-<div class="callout"><div class="t">为什么单列 Query 重写</div>业务给的查询常常口语、含糊或太长。检索前先<span class="k">改写、扩展、或拆成多条子查询</span>(必要时用 HyDE 先生成假设答案再检索),能明显提升召回质量。它是可插拔的前置步骤,挂了就回退用原始 query,不影响主链路。</div>
+<h4>几个选型要点</h4>
+<ul>
+  <li><span class="k">自建 vs 云:</span>基础设施(向量库、图库、解析、嵌入)优先云托管;但知识图谱 / 效果库、入库 pipeline 逻辑两类核心资产必须自有、可迁移——借云的算力和组件,不把飞轮交给云。</li>
+  <li><span class="k">图谱分期、按需投入:</span>多数企业问答是查资料 / 规则 / 产品 / FAQ,关系类多跳占比不高,不宜一上来就重投。一期只建图谱 schema + 存储 + concept 投影(从 SSOT 派生,近零成本),检索主力是向量 + BM25 + rerank,同时埋点统计关系类查询真实占比;二期占比与价值显著时,再叠加按重要性采样的图谱抽取与多跳推理。先建 schema 让二期能直接加码,不必重做数据模型。</li>
+  <li><span class="k">图谱抽取的成本边界:</span>GraphRAG 索引阶段是重 LLM 调用,千万级 chunk 全量跑成本可达嵌入的数倍。故只对需要多跳的库(行业 / 领域 / 品牌)按重要性采样抽取(高价值文档,长尾走纯向量),抽取调用经 Token 网关计量纳入预算。</li>
+  <li><span class="k">Query 重写单列:</span>业务查询常口语、含糊或过长,检索前改写 / 扩展 / 拆子查询(必要时 HyDE)可提升召回。它是可插拔前置步骤,失败回退原始 query,不影响主链路。</li>
+</ul>
 </section>
 
 <!-- ============ 九、非功能设计与工程保障 ============ -->
@@ -857,7 +956,7 @@ RETURN c, i, collect(x)[..20] AS competitors</pre>
 </table>
 <p class="muted"><span class="k">隔离按客户(tenant),复用按业务线(app/role)</span>:"建站和社媒共享同一客户的产品库"是<span class="k">同租户内</span>的事,"A 客户看不到 B 客户"是<span class="k">跨租户</span>的事,两者在不同轴上,不冲突。</p>
 <ul>
-  <li><span class="k">隔离实现:</span>向量库用 namespace=tenant、文档库用行级 <code class="inl">tenant_id</code>、图库用<span class="k">按 tenant 分子图 + 服务层强制注入</span>(见下);默认<span class="k">逻辑隔离</span>,大客户 / 敏感客户可升级为<span class="k">物理隔离</span>(独立索引 / 命名空间 / 库)。</li>
+  <li><span class="k">隔离实现:</span>向量库用 namespace=tenant、文档库用行级 <code class="inl">tenant_id</code>、图库用<span class="k">按 tenant 分子图 + 服务层强制注入</span>;默认<span class="k">逻辑隔离</span>,大客户 / 敏感客户可升级为<span class="k">物理隔离</span>(独立索引 / 命名空间 / 库)。</li>
   <li><span class="k">跨业务线共享:</span>同一 tenant 下,记录的 <code class="inl">acl</code> 标 <code class="inl">role:builder/social/geo</code> 决定哪条业务线可见;不打 role 标的默认全业务线可见。业务线在网关注入 <code class="inl">app + role</code>,服务层据此过滤。</li>
   <li><span class="k">跨客户复用(唯一例外):</span>只有<span class="k">脱敏后的领域库、效果库</span>(按行业 × 市场切片、且满足 9.4 的 k-匿名阈值)落在保留租户 <code class="inl">shared</code> 下,所有业务线只读;原始客户数据永不进 <code class="inl">shared</code>。</li>
   <li><span class="k">图库隔离(最弱面,重点加固):</span>图查询<span class="k">不暴露裸 Cypher</span>,只暴露<span class="k">参数化子图模板</span>,租户过滤由服务层强制注入(调用方无法绕过);每个 Cypher 模板都内建 <code class="inl">WHERE n.tenant_id = $tenant</code>,经评审固化。<code class="inl">kb_graph</code> 工具(6.4)同理——只收模板名 + 参数,不收自由查询语句。</li>
@@ -899,15 +998,16 @@ RETURN c, i, collect(x)[..20] AS competitors</pre>
 </ul>
 
 <h3>9.8 评测:让"越用越准"可度量</h3>
-<p>RAG 底座的调优(切分粒度、嵌入模型、是否 rerank、图谱是否介入)<span class="k">必须靠评测驱动</span>,否则改了不知好坏、也发现不了回归。评测与治理同级,作为横切能力建设——一期可先做离线抽样,不必上全自动。</p>
+<p>RAG 底座的调优(切分粒度、嵌入模型、是否 rerank、图谱是否介入)<span class="k">必须靠评测驱动</span>,否则改了不知好坏、也发现不了回归。评测与治理同级,作为横切能力建设——一期先做离线抽样,以 <span class="k">Ragas 框架</span>建立基线,不必上全自动。</p>
 <table>
-<tr><th style="width:22%">维度</th><th style="width:30%">指标</th><th>怎么测</th></tr>
-<tr><td><span class="k">检索质量</span></td><td>Recall@k / nDCG / 命中率</td><td>维护一个带标注的查询-相关片段评测集,定期跑;切分 / 嵌入 / rerank 改动前后对比</td></tr>
-<tr><td><span class="k">生成忠实度</span></td><td>groundedness(答案是否有据)</td><td>抽样让裁判模型核对答案每句是否被检索片段支撑,标出幻觉</td></tr>
-<tr><td><span class="k">引用准确率</span></td><td>citation precision</td><td>核对 citations 指向的 chunk 是否真支撑该结论</td></tr>
+<tr><th style="width:22%">维度</th><th style="width:32%">指标(对应 Ragas)</th><th>怎么测</th></tr>
+<tr><td><span class="k">检索质量</span></td><td>Context Precision / Recall(命中率、nDCG)</td><td>维护一个带标注的查询-相关片段评测集,定期跑;切分 / 嵌入 / rerank 改动前后对比</td></tr>
+<tr><td><span class="k">生成忠实度</span></td><td>Faithfulness(答案是否有据、无幻觉)</td><td>抽样让裁判模型核对答案每句是否被检索片段支撑,标出幻觉</td></tr>
+<tr><td><span class="k">回答相关性</span></td><td>Answer Relevance(答案是否切题)</td><td>裁判模型评估答案与原始 query 的相关度</td></tr>
+<tr><td><span class="k">引用准确率</span></td><td>citation precision</td><td>核对 citations 指向的 concept / chunk 是否真支撑该结论</td></tr>
 <tr><td><span class="k">线上代理指标</span></td><td>cache 命中率 / 空召回率 / 人工采纳率</td><td>从可观测埋点取,持续监控,异常告警</td></tr>
 </table>
-<p class="muted">闭环:线上低分案例(空召回、被标幻觉、未采纳)回流为评测集新样本,驱动下一轮切分 / 模型 / 阈值调整。</p>
+<p class="muted">闭环:线上低分案例(空召回、被标幻觉、未采纳)回流为评测集新样本,驱动下一轮切分 / 模型 / 阈值调整。Ragas 的检索 + 生成 + 相关性三元组构成升级前后的回归基线。</p>
 </section>
 
 </div>
